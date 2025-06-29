@@ -185,3 +185,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# default output directory
+civitai_archive_downloads
