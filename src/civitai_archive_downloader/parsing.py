@@ -50,6 +50,7 @@ def get_model_page_metadata(html: str):
 	type_list = type_container.select("div").matches[1:]
 	meta["content_type"] = _make_file_name(type_list[0].text() )
 	meta["base_model"] = _make_file_name(type_list[1].text() )
+	meta["model_name"] = _make_file_name(parser.select('[href^="/models/"]').matches[0].text())
 	return meta
 	
 def get_version_metadata(html: str):

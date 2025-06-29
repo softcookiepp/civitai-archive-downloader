@@ -3,6 +3,7 @@ from selectolax.parser import HTMLParser
 import os
 from . import parsing
 import json
+import hashlib
 
 def _mkdir(d):
 	if not os.path.exists(d):
@@ -54,6 +55,8 @@ class CivitaiArchiveDownloader:
 			with requests.get(url, stream=True, headers = headers,
 					data = {}, params = {}) as r:
 				try:
+					if r.status_code == 404:
+						return None
 					r.raise_for_status()
 					for chunk in r.iter_content(chunk_size=8192): 
 						# If you have chunk encoded response uncomment if
@@ -79,6 +82,14 @@ class CivitaiArchiveDownloader:
 		
 		# all done!
 		return final_path
+	
+	def download_from_search_query(self, query, is_nsfw = True, is_deleted = False):
+		rsp = requests.get("https://civitaiarchive.com/api/search",
+			params = {"q": query, "is_nsfw": is_nsfw, "is_deleted": is_deleted})
+		rsp_json = json.loads(rsp.text)
+		for item in rsp_json["results"]:
+			if "/models/" in item["url"]:
+				self.download_model(f"https://civitaiarchive.com{item['url']}")
 
 	def download_model(self, url: str, version = "all"):
 		"""
@@ -101,11 +112,15 @@ class CivitaiArchiveDownloader:
 		base_path = os.path.join(cat_path, top_level_metadata["base_model"])
 		_mkdir(base_path)
 		
+		# totally forgot about the model name path itself
+		model_path = os.path.join(base_path, top_level_metadata["model_name"])
+		_mkdir(model_path)
+		
 		# now iterate over each version
 		versions = parsing.get_model_versions(rsp.text)
 		for version_name, version_url in versions.items():
 			# make directory for the version
-			version_path = os.path.join(base_path, version_name)
+			version_path = os.path.join(model_path, version_name)
 			_mkdir(version_path)
 			
 			# get remaining version metadata if needed
@@ -127,11 +142,16 @@ class CivitaiArchiveDownloader:
 					json.dump(metadata, f, indent = 3)
 				
 				for mirror in metadata["files"]:
+					# try each mirror to see if it works
 					print(mirror["filename"])
 					
 					file_path = os.path.join(version_path, mirror["filename"])
-					self._get_large_file(file_path, mirror["url"])
-					
-					# gotta handle error implementing at some point
-					break
+					print("downloading to:", file_path)
+					rsp = requests.get(mirror["url"] )
+					if rsp.status_code == 200:
+						with open(file_path, "wb") as f:
+							f.write(rsp.content)
+						
+						# gotta handle error implementing at some point
+						break
 		

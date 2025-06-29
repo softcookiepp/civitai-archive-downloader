@@ -15,6 +15,7 @@ def main() -> None:
 						help='Display version',
 						action='store_true',
 						dest='version')
+	parser.add_argument("--query", "-q", help = "Search query to download everything from")
 	parser.add_argument("--url", help = "URLs to get model data from, separated by commas (,)")
 	parser.add_argument("--output", "-o", help = "Output directory to save model files in, defaults to civitai_archive_downloads in local dir")
 	parser.add_argument("--test", help="Run tests", action = "store_true", dest = "test")
@@ -29,6 +30,8 @@ def main() -> None:
 		return
 	if args.test:
 		run_tests()
+	elif not args.query is None:
+		downloader.download_from_search_query(args.query)
 	elif not args.url is None:
 		downloader.download_model(args.url)
 

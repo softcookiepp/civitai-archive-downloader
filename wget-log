@@ -1,0 +1,11 @@
+--2025-06-29 15:36:43--  https://civitaiarchive.com/search?q=taylor
+Resolving civitaiarchive.com (civitaiarchive.com)... 2606:4700:3033::6815:1958, 2606:4700:3035::ac43:85e6, 104.21.25.88, ...
+Connecting to civitaiarchive.com (civitaiarchive.com)|2606:4700:3033::6815:1958|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: unspecified [text/html]
+Saving to: ‘search?q=taylor’
+
+search?q=taylor                                [<=>                                                                                   ]       0  --.-KB/s               search?q=taylor                                [ <=>                                                                                  ]  16.34K  --.-KB/s    in 0s      
+
+2025-06-29 15:36:43 (47.1 MB/s) - ‘search?q=taylor’ saved [16733]
+
