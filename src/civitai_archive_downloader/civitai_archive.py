@@ -10,17 +10,29 @@ def _mkdir(d):
 		os.mkdir(d)
 
 class CivitaiArchiveDownloader:
-	def __init__(self, root_dir = None):
+	def __init__(self, root_dir = None, api_key = None):
 		self._root_dir = root_dir
 		if root_dir is None:
 			"just default to ./civitai_archive_downloads"
 			self._root_dir = os.path.join(os.getcwd(), "civitai_archive_downloads")
 			_mkdir(self._root_dir)
+		self._api_key = api_key
+		if api_key is None:
+			if "CIVITAI_API_KEY" in os.environ.keys():
+				self._api_key = os.environ["CIVITAI_API_KEY"]
+		self._last_rsp = None
+	
+	def _get(self, url : str, headers = {}, data = {}, params = {}, full_url = False):	
+		if "civitai.com" in url:
+			params["token"] = self._api_key
+		self._last_rsp = requests.get(url, headers = headers, data = data,
+			params = params)
+		return self._last_rsp
 
 	def _get_file_metadata(self, files):
 		mirrors = {}
 		for file_hash, _ in files.items():
-			rsp = requests.get(f"https://civitaiarchive.com/api/sha256/{file_hash}")
+			rsp = self._get(f"https://civitaiarchive.com/api/sha256/{file_hash}")
 			mirrors[file_hash] = json.loads(rsp.text)
 		return mirrors
 		
@@ -52,7 +64,7 @@ class CivitaiArchiveDownloader:
 			# NOTE the stream=True parameter below
 			encountered_error = False
 			headers.update( {"Range": f"bytes={offset}-"} )
-			with requests.get(url, stream=True, headers = headers,
+			with self._get(url, stream=True, headers = headers,
 					data = {}, params = {}) as r:
 				try:
 					if r.status_code == 404:
@@ -84,7 +96,7 @@ class CivitaiArchiveDownloader:
 		return final_path
 	
 	def download_from_search_query(self, query, is_nsfw = True, is_deleted = False):
-		rsp = requests.get("https://civitaiarchive.com/api/search",
+		rsp = self._get("https://civitaiarchive.com/api/search",
 			params = {"q": query, "is_nsfw": is_nsfw, "is_deleted": is_deleted})
 		rsp_json = json.loads(rsp.text)
 		for item in rsp_json["results"]:
@@ -103,7 +115,7 @@ class CivitaiArchiveDownloader:
 					- webpage archive
 					- metadata file derived from archive
 		"""
-		rsp = requests.get(url)
+		rsp = self._get(url)
 		top_level_metadata = parsing.get_model_page_metadata(rsp.text)
 		
 		# create directory for content category and model base
@@ -124,7 +136,7 @@ class CivitaiArchiveDownloader:
 			_mkdir(version_path)
 			
 			# get remaining version metadata if needed
-			rsp = requests.get(version_url)
+			rsp = self._get(version_url)
 			version_metadata = parsing.get_version_metadata(rsp.text)
 			version_metadata.update(top_level_metadata)
 			
@@ -137,21 +149,27 @@ class CivitaiArchiveDownloader:
 			files = parsing.get_file_hashes(rsp.text)
 			meta = self._get_file_metadata(files)
 			for (file_hash, file_name), (_, metadata) in zip(files.items(), meta.items() ):
-				json_path = os.path.join(version_path, f"{file_name}.json")
-				with open(json_path, "w") as f:
-					json.dump(metadata, f, indent = 3)
-				
+				file_path = os.path.join(version_path, metadata["files"][0]["filename"])
+				print("downloading to:", file_path)
+				success = False
 				for mirror in metadata["files"]:
 					# try each mirror to see if it works
-					print(mirror["filename"])
+					rsp = self._get(mirror["url"] )
 					
-					file_path = os.path.join(version_path, mirror["filename"])
-					print("downloading to:", file_path)
-					rsp = requests.get(mirror["url"] )
 					if rsp.status_code == 200:
 						with open(file_path, "wb") as f:
 							f.write(rsp.content)
 						
 						# gotta handle error implementing at some point
+						success = True
 						break
+					else:
+						print(f"Download failed with error {rsp.status_code}, trying a different mirror...")
+				if success:
+					print("Download successful!")
+					json_path = os.path.join(version_path, f"{file_name}.json")
+					with open(json_path, "w") as f:
+						json.dump(metadata, f, indent = 3)
+				else:
+					print(f"None of the mirrors worked for {file_name}")
 		
